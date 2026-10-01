@@ -1,0 +1,71 @@
+[package]
+name = "tftio-mnene"
+version = "0.3.3"
+edition = "2024"
+rust-version = "1.97"
+license = "MIT"
+description = "Agent-to-agent memory store with a CLI and an MCP stdio server"
+readme = "README.md"
+repository = "https://github.com/tftio/mnene"
+keywords = ["agents", "memory", "mcp", "sqlite", "fts5"]
+categories = ["development-tools"]
+# Not published to crates.io while the GitHub repository is the distribution
+# channel. Revisit before re-enabling.
+publish = false
+
+[lints.rust]
+unsafe_code = "deny"
+missing_docs = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+dbg_macro = "deny"
+enum_glob_use = "deny"
+expect_used = "deny"
+indexing_slicing = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+unwrap_used = "deny"
+wildcard_imports = "deny"
+multiple_crate_versions = "allow"
+cargo_common_metadata = "allow"
+missing_errors_doc = "deny"
+missing_panics_doc = "deny"
+
+[lib]
+name = "mnene"
+path = "src/lib.rs"
+
+[[bin]]
+name = "mnene"
+path = "src/main.rs"
+# main.rs has no #[test] items of its own -- every test of it lives in
+# tests/cli.rs, which drives the compiled binary as a subprocess rather than
+# linking it. Cargo's implicit "unit test harness for this bin target" build
+# is therefore both useless (it runs zero tests) and actively harmful to
+# `cargo llvm-cov`: that harness recompiles main.rs (and the mnene lib it
+# links) under a second, never-invoked instantiation, which drags down the
+# per-file function/line coverage percentages `mise run check:coverage`
+# reports even though every real line is exercised. Disabling it removes
+# that phantom instantiation.
+test = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+anyhow = "1"
+clap = { version = "4", features = ["derive", "env"] }
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+uuid = { version = "1.26.0", features = ["v7", "serde"] }
+jiff = "0.2.35"
+serde_json = "1"
+tftio-lib = "0.4.0"
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3.1.4"
+tempfile = "3.27.0"
