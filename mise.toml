@@ -1,25 +1,25 @@
 [tools]
-rust = { version = "1.97.1", profile = "minimal", components = ["clippy", "rustfmt", "rust-src", "rust-analyzer", "llvm-tools"] }
-prek = "0.4.10"
+rust = { version = "1.99.1", profile = "minimal", components = ["clippy", "rustfmt", "rust-src", "rust-analyzer", "llvm-tools"] }
+prek = "0.5.10"
 cocogitto = "7.0.0"
 taplo = "0.10.0"
 shellcheck = "0.11.0"
-typos = "1.48.0"
+typos = "1.52.0"
 # Rust dev tools are declared here rather than pinned inside task bodies: only a
 # `[tools]` declaration is visible to `mise upgrade --bump` and recorded in
 # `mise.lock`. A version embedded in a task's shell string is invisible to both,
 # and duplicating one across tasks lets the copies drift. The cargo backend
 # records a version and backend but no checksum or provenance.
-"cargo:cargo-nextest" = "0.9.140"
+"cargo:cargo-nextest" = "0.9.151"
 "cargo:cargo-machete" = "0.9.2"
 "cargo:cargo-audit" = "0.22.2"
 "cargo:cargo-deny" = "0.20.2"
-"cargo:cargo-llvm-cov" = "0.8.7"
+"cargo:cargo-llvm-cov" = "0.9.1"
 "cargo:cargo-mutants" = "27.1.0"
 # Provides `cargo set-version`, which the release:version task calls. Declared
 # here for the same reason as the rest: an undeclared release-path tool is one
 # that is neither installed nor pinned in the generated repository.
-"cargo:cargo-edit" = "0.13.13"
+"cargo:cargo-edit" = "0.13.14"
 
 [settings]
 lockfile = true
