@@ -33,7 +33,7 @@ backend = "cargo:cargo-mutants"
 specifiers = ["27.1.0"]
 
 [[tools."cargo:cargo-nextest"]]
-version = "0.9.150"
+version = "0.9.140"
 backend = "cargo:cargo-nextest"
 specifiers = ["0.9.140"]
 
@@ -99,10 +99,12 @@ backend = "aqua:tamasfe/taplo"
 specifiers = ["0.10.0"]
 
 [tools.taplo."platforms.linux-x64"]
+checksum = "sha256:8fe196b894ccf9072f98d4e1013a180306e17d244830b03986ee5e8eabeb6156"
 url = "https://github.com/tamasfe/taplo/releases/download/0.10.0/taplo-linux-x86_64.gz"
 url_api = "https://api.github.com/repos/tamasfe/taplo/releases/assets/257322600"
 
 [tools.taplo."platforms.macos-arm64"]
+checksum = "sha256:713734314c3e71894b9e77513c5349835eefbd52908445a0d73b0c7dc469347d"
 url = "https://github.com/tamasfe/taplo/releases/download/0.10.0/taplo-darwin-aarch64.gz"
 url_api = "https://api.github.com/repos/tamasfe/taplo/releases/assets/257323110"
 
