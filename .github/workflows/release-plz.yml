@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   release-plz:
-    uses: tftio/gh-actions/.github/workflows/release-plz.yml@v2.3.2
+    uses: tftio/gh-actions/.github/workflows/release-plz.yml@v2.5.0
     with:
       app-id: ${{ vars.RELEASE_BOT_APP_ID }}
     secrets:

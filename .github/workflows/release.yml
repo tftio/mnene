@@ -9,4 +9,4 @@ permissions:
 
 jobs:
   artifacts:
-    uses: tftio/gh-actions/.github/workflows/rust-artifacts.yml@v2.0.0
+    uses: tftio/gh-actions/.github/workflows/rust-artifacts.yml@v2.5.0
