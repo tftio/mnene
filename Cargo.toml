@@ -60,8 +60,8 @@ thiserror = "2.0.21"
 anyhow = "1.0.104"
 clap = { version = "4.6.7", features = ["derive", "env"] }
 rusqlite = { version = "0.41.1", features = ["bundled"] }
-uuid = { version = "1.29.0", features = ["v7", "serde"] }
-jiff = "0.2.38"
+uuid = { version = "1.29.2", features = ["v7", "serde"] }
+jiff = "0.2.41"
 serde_json = "1.0.154"
 tftio-lib = "0.4.3"
 
