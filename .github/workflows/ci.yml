@@ -7,4 +7,4 @@ on:
 
 jobs:
   ci:
-    uses: tftio/gh-actions/.github/workflows/rust-ci.yml@v2.0.0
+    uses: tftio/gh-actions/.github/workflows/rust-ci.yml@v2.5.0
