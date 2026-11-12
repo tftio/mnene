@@ -6,6 +6,6 @@
 # exists so every consumer mise does not reach -- the rustup proxies,
 # rust-analyzer, an IDE, a contributor with no mise -- resolves this pin.
 [toolchain]
-channel = "1.97.1"
+channel = "1.100.0"
 profile = "minimal"
 components = ["clippy", "rustfmt", "rust-src", "rust-analyzer", "llvm-tools"]
