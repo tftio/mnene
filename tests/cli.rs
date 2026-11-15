@@ -102,6 +102,149 @@ impl Env {
     }
 }
 
+#[test]
+fn configured_scope_supports_non_project_memory_use() -> Result<(), Box<dyn std::error::Error>> {
+    let env = Env::new()?;
+    let config_dir = env.home.join(".config/mnene");
+    std::fs::create_dir_all(&config_dir)?;
+    std::fs::write(
+        config_dir.join("config.toml"),
+        "default_scope = 'personal'\n",
+    )?;
+
+    let output = env
+        .command()?
+        .env_remove("MNENE_SCOPE")
+        .args(["--json", "put", "configuredscopeword"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let created: Value = serde_json::from_slice(&output)?;
+    let id = field(&created, "id")?.as_str().ok_or("missing id")?;
+
+    // The configured fallback does not override explicit attribution.
+    put(&env, "configuredscopeword other scope", &[])?;
+    let output = env
+        .command()?
+        .env_remove("MNENE_SCOPE")
+        .args(["--json", "recall"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let memories: Value = serde_json::from_slice(&output)?;
+    assert_eq!(1, array_len(&memories)?);
+    let memory = first_element(&memories)?;
+    let provenance = field(memory, "provenance")?;
+    assert_eq!("personal", *field(provenance, "scope")?);
+    assert_eq!("config", *field(provenance, "scope_source")?);
+    assert_eq!(id, *field(memory, "id")?);
+
+    let output = env
+        .command()?
+        .env_remove("MNENE_SCOPE")
+        .args(["--json", "search", "configuredscopeword"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let hits: Value = serde_json::from_slice(&output)?;
+    assert_eq!(1, array_len(&hits)?);
+    assert_eq!(id, *field(first_element(&hits)?, "id")?);
+
+    env.command()?
+        .env_remove("MNENE_SCOPE")
+        .args(["overwrite", id, "replacement memory"])
+        .assert()
+        .success();
+    env.command()?
+        .env_remove("MNENE_SCOPE")
+        .arg("recall")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("scope_source: config"));
+    Ok(())
+}
+
+#[test]
+fn xdg_configuration_takes_precedence_over_home() -> Result<(), Box<dyn std::error::Error>> {
+    let env = Env::new()?;
+    let home_config = env.home.join(".config/mnene");
+    let xdg_root = env.home.join("xdg-config");
+    std::fs::create_dir_all(&home_config)?;
+    std::fs::create_dir_all(xdg_root.join("mnene"))?;
+    std::fs::write(home_config.join("config.toml"), "invalid TOML")?;
+    std::fs::write(
+        xdg_root.join("mnene/config.toml"),
+        "default_scope = 'general'\n",
+    )?;
+    env.command()?
+        .env_remove("MNENE_SCOPE")
+        .env("XDG_CONFIG_HOME", &xdg_root)
+        .args(["put", "xdg memory"])
+        .assert()
+        .success();
+    env.command()?
+        .env_remove("MNENE_SCOPE")
+        .env("XDG_CONFIG_HOME", &xdg_root)
+        .arg("recall")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("scope: general"));
+    Ok(())
+}
+
+#[test]
+fn invalid_configuration_fails_before_opening_storage() -> Result<(), Box<dyn std::error::Error>> {
+    for (text, message) in [
+        ("not TOML", "configuration error"),
+        ("", "default_scope"),
+        ("default_scope = 42", "string"),
+        ("default_scope = ''", "default_scope must not be blank"),
+        ("default_scope = '  '", "default_scope must not be blank"),
+        (
+            "default_scope = 'personal'\nunrecognized = true",
+            "unknown field",
+        ),
+    ] {
+        let env = Env::new()?;
+        let config_dir = env.home.join(".config/mnene");
+        std::fs::create_dir_all(&config_dir)?;
+        let path = config_dir.join("config.toml");
+        std::fs::write(&path, text)?;
+        env.command()?
+            .arg("recall")
+            .assert()
+            .failure()
+            .stderr(predicate::str::contains(path.to_string_lossy().as_ref()))
+            .stderr(predicate::str::contains(message));
+        assert!(!env.db.exists());
+    }
+    Ok(())
+}
+
+#[test]
+fn unreadable_configuration_reports_the_path() -> Result<(), Box<dyn std::error::Error>> {
+    let env = Env::new()?;
+    let path = env.home.join(".config/mnene/config.toml");
+    // A directory at the file path fails even when tests run as root.
+    std::fs::create_dir_all(&path)?;
+    env.command()?
+        .args(["--json", "recall"])
+        .assert()
+        .failure()
+        .stdout(
+            predicate::str::contains("configuration error")
+                .and(predicate::str::contains(path.to_string_lossy().as_ref())),
+        );
+    assert!(!env.db.exists());
+    Ok(())
+}
+
 /// Looks up `key` in a JSON object `value`, without `clippy::indexing_slicing`:
 /// a missing field becomes a typed test failure rather than a panic.
 fn field<'a>(value: &'a Value, key: &str) -> Result<&'a Value, String> {

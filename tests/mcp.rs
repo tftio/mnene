@@ -360,6 +360,36 @@ fn assert_exits_ok(session: Session) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
+fn stdio_uses_the_configured_scope_outside_a_project() -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::new()?;
+    let config_dir = fixture.home.join(".config/mnene");
+    std::fs::create_dir_all(&config_dir)?;
+    std::fs::write(
+        config_dir.join("config.toml"),
+        "default_scope = 'personal'\n",
+    )?;
+    let mut session = Session::spawn(&fixture.db, &fixture.home, &[("MNENE_AGENT", "agent-a")])?;
+    assert_initialize(&mut session)?;
+    let id = run_put(&mut session, "non-project memory", &[])?;
+    session.send(&json!({
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "tools/call",
+        "params": { "name": "recall", "arguments": {} },
+    }))?;
+    let response = session.recv()?;
+    let result = field(&response, "result")?;
+    assert!(!is_error(result)?);
+    let memories: Value = serde_json::from_str(&tool_text(result)?)?;
+    let memory = first_element(&memories)?;
+    assert_eq!(&id, field(memory, "id")?.as_str().ok_or("missing id")?);
+    let provenance = field(memory, "provenance")?;
+    assert_eq!("personal", *field(provenance, "scope")?);
+    assert_eq!("config", *field(provenance, "scope_source")?);
+    assert_exits_ok(session)
+}
+
+#[test]
 fn stdio_handshake_initializes_lists_tools_and_round_trips_a_memory()
 -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::new()?;
