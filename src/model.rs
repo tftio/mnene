@@ -231,7 +231,8 @@ impl<'de> Deserialize<'de> for Tag {
 /// `tftio_lib::project` tiers ([`ScopeSource::Declared`], [`ScopeSource::Path`],
 /// [`ScopeSource::Remote`], [`ScopeSource::Derived`]), then
 /// [`ScopeSource::Clanker`] (`CLANKER_SESSION_PROJECT`), then
-/// [`ScopeSource::Directory`] (the git repository's name).
+/// [`ScopeSource::Directory`] (the git repository's name), and finally
+/// [`ScopeSource::Config`] (the configured default scope).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ScopeSource {
@@ -250,6 +251,8 @@ pub enum ScopeSource {
     Clanker,
     /// The name of the git repository containing the working directory.
     Directory,
+    /// The fallback `default_scope` in the user configuration file.
+    Config,
 }
 
 impl ScopeSource {
@@ -265,6 +268,7 @@ impl ScopeSource {
             Self::Derived => "derived",
             Self::Clanker => "clanker",
             Self::Directory => "directory",
+            Self::Config => "config",
         }
     }
 }
@@ -283,7 +287,7 @@ impl FromStr for ScopeSource {
     /// # Errors
     ///
     /// Returns [`MneneError::Storage`] naming the value when `s` is not one
-    /// of the seven stable labels [`ScopeSource::as_str`] produces.
+    /// of the stable labels [`ScopeSource::as_str`] produces.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "env" => Ok(Self::Env),
@@ -293,6 +297,7 @@ impl FromStr for ScopeSource {
             "derived" => Ok(Self::Derived),
             "clanker" => Ok(Self::Clanker),
             "directory" => Ok(Self::Directory),
+            "config" => Ok(Self::Config),
             other => Err(MneneError::Storage(format!(
                 "unknown scope_source: {other}"
             ))),
@@ -389,6 +394,9 @@ pub enum MneneError {
     /// A scope was required but none was configured.
     #[error("scope is required")]
     MissingScope,
+    /// A user configuration file could not be read or validated.
+    #[error("configuration error: {0}")]
+    Configuration(String),
     /// An agent identifier was required but none was configured.
     #[error("agent is required")]
     MissingAgent,
@@ -859,6 +867,7 @@ mod tests {
             ScopeSource::Derived,
             ScopeSource::Clanker,
             ScopeSource::Directory,
+            ScopeSource::Config,
         ] {
             let parsed: ScopeSource = source.as_str().parse()?;
             assert_eq!(source, parsed);
@@ -875,6 +884,7 @@ mod tests {
         assert_eq!("derived", ScopeSource::Derived.to_string());
         assert_eq!("clanker", ScopeSource::Clanker.to_string());
         assert_eq!("directory", ScopeSource::Directory.to_string());
+        assert_eq!("config", ScopeSource::Config.to_string());
     }
 
     #[test]

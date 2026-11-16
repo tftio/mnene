@@ -235,18 +235,45 @@ specific first:
 | `agent` | `MNENE_AGENT`, else `CLANKER_SESSION_HARNESS`, else `MissingAgent` on write verbs (`put`, `overwrite`, `retract`) |
 | `context` | `MNENE_CONTEXT`, else `CLANKER_SESSION_CONTEXT`, else `default` |
 | `session` | `MNENE_SESSION`, else `CLANKER_SESSION_ID`, else absent |
-| `scope` | `MNENE_SCOPE`, else `tftio_lib::project` resolution (below), else `CLANKER_SESSION_PROJECT` (non-empty), else the name of the git repository containing the working directory, else `MissingScope` on `put`, `overwrite`, and scoped `search`/`recall` |
+| `scope` | `MNENE_SCOPE`, else `tftio_lib::project` resolution (below), else `CLANKER_SESSION_PROJECT` (non-empty), else the name of the git repository containing the working directory, else configured `default_scope`, else `MissingScope` on `put`, `overwrite`, and scoped `search`/`recall` |
 | `task` | `MNENE_TASK`, else the current git branch, else absent |
 | `db` | `--db`, else `MNENE_DB`, else `$XDG_DATA_HOME/mnene/<context>.db`, else `$HOME/.local/share/mnene/<context>.db`, else `<cwd>/.mnene/<context>.db` when none of those is set |
 
-### Scope names the project
+### Configuration file
 
-`scope` names the project the working directory belongs to, not the
-repository or the worktree.
+<!-- AGENT_GENERATED: t; AGENT_MODEL: GPT-6.1; AGENT_DATE: 2026-11-15 -->
+
+To use scoped memories outside a project, create
+`$XDG_CONFIG_HOME/mnene/config.toml`, or `~/.config/mnene/config.toml` when
+`XDG_CONFIG_HOME` is unset:
+
+```toml
+default_scope = "personal"
+```
+
+Choose a scope name for non-project memories. There is no built-in default.
+The file is optional for project use; a present file must contain a nonblank
+string `default_scope`. Unknown keys, invalid TOML, and read errors stop the
+command with the configuration path in the error. If `XDG_CONFIG_HOME` is
+set, mnene uses only that configuration location, not a second file under
+`HOME`. With neither variable available, it does not load a config file.
+
+The configured scope is a final fallback, not an override of project discovery
+or `MNENE_SCOPE`. It changes neither the database location nor existing memories.
+It is loaded once per CLI invocation or MCP server startup, so restart a running
+MCP server after editing it. Writes still require `MNENE_AGENT` or its clanker
+fallback.
+
+### Scope resolution
+
+<!-- AGENT_GENERATED: t; AGENT_MODEL: GPT-6.1; AGENT_DATE: 2026-11-15 -->
+
+`scope` names the project the working directory belongs to, or the configured
+default when no project resolves. It does not name an individual worktree.
 Per invocation, `mnene` tries each tier below in order and stops at the
 first one that answers; which tier answered is recorded alongside the value
 as `scope_source` (`env`, `declared`, `path`, `remote`, `derived`, `clanker`,
-or `directory`, matching the row names below) and stored with every write.
+`directory`, or `config`, matching the row names below) and stored with every write.
 
 1. **`env`** -- an explicit `MNENE_SCOPE`.
 2. **`tftio_lib::project` resolution** against the registry installed at
@@ -270,8 +297,10 @@ or `directory`, matching the row names below) and stored with every write.
    worktree): a repository whose common
    directory is `<repo>/.git` is named by the directory holding it, and a
    conventional bare clone is named by its own directory with the `.git`
-   suffix removed. This is the last resort, so a repository with no remote
-   and no registered path resolves to its repository name.
+   suffix removed. A repository with no remote and no registered path
+   resolves to its repository name before using the configured default.
+5. `config` -- `default_scope` from the user configuration file, when present.
+   Without a configured default, unresolved scopes remain absent.
 
 A registry that fails to load (missing permissions, malformed TOML) is
 reported loudly on stderr and treated as empty, so a broken registry

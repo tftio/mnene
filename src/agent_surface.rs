@@ -64,8 +64,8 @@ const PUT_CAPABILITY: AgentCapability = AgentCapability::new(
 )
 .with_constraints(
     "requires MNENE_AGENT (or the CLANKER_SESSION_HARNESS fallback) and a \
-     scope (MNENE_SCOPE, or the git repository name discovered from the \
-     working directory) to be resolvable \
+     scope (MNENE_SCOPE, project discovery, or default_scope in \
+     mnene/config.toml) to be resolvable \
      at the process edge; a write with neither fails with a typed \
      MissingAgent or MissingScope error rather than storing an unattributed \
      memory. The body must be non-blank after trimming.",
@@ -136,7 +136,8 @@ const SEARCH_CAPABILITY: AgentCapability = AgentCapability::new(
 )
 .with_constraints(
     "by default only memories in the resolvable scope are searched \
-     (requires MNENE_SCOPE or git discovery unless --all-scopes is given); \
+     (requires MNENE_SCOPE, project discovery, or configured default_scope \
+     unless --all-scopes is given); \
      retracted memories are never returned, and superseded memories are \
      excluded unless --include-superseded is given -- --include-superseded \
      never surfaces retracted memories",
@@ -177,7 +178,8 @@ const RECALL_CAPABILITY: AgentCapability = AgentCapability::new(
 .with_constraints(
     "only active memories are returned, never superseded or retracted \
      ones; by default only the resolvable scope is included (requires \
-     MNENE_SCOPE or git discovery unless --all-scopes is given); --task \
+     MNENE_SCOPE, project discovery, or configured default_scope unless \
+     --all-scopes is given); --task \
      narrows to memories recorded under one task and is never inferred \
      from MNENE_TASK -- omitting it returns every task's memories in scope",
 )

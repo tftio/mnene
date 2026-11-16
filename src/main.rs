@@ -508,7 +508,7 @@ fn run(cli: Cli, snapshot: ProcessSnapshot) -> Result<i32, FatalCliError> {
     let label = domain_label(&domain_verb);
 
     let current_dir = snapshot.current_dir.map_err(wrap_fatal(label, output))?;
-    let config = Config::resolve(raw, &current_dir);
+    let config = Config::load(raw, &current_dir).map_err(wrap_fatal(label, output))?;
 
     let mut store = SqliteStore::open(&config.db).map_err(wrap_fatal(label, output))?;
 

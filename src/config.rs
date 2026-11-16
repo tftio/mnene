@@ -8,7 +8,8 @@
 //! path, a registry remote, or a slug derived from an unregistered remote),
 //! then `CLANKER_SESSION_PROJECT`, then the name of the git repository
 //! containing the working directory, then absent. Which tier answered is
-//! recorded as [`crate::model::ScopeSource`].
+//! recorded as [`crate::model::ScopeSource`]. [`crate::config::Config::load`] also loads the
+//! user configuration and applies `default_scope` as a final fallback.
 //!
 //! This module never calls `std::env`; every raw value arrives as an
 //! argument, per RS-008.
@@ -23,6 +24,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use serde::Deserialize;
 use tftio_lib::project::{
     ProjectRoot, Source, default_registry_dir, discover_inputs, load_registry, project_root,
     repository_name, resolve as resolve_project,
@@ -33,6 +35,40 @@ use crate::model::ScopeSource;
 /// The default context name used when neither `MNENE_CONTEXT` nor
 /// `CLANKER_SESSION_CONTEXT` is set.
 const DEFAULT_CONTEXT: &str = "default";
+
+/// The required contents of a user-provided configuration file.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileConfig {
+    default_scope: String,
+}
+
+/// Load the optional user configuration, validating it at the I/O boundary.
+fn load_default_scope(
+    xdg_config_home: Option<&Path>,
+    home: Option<&Path>,
+) -> Result<Option<String>, crate::model::MneneError> {
+    let Some(root) = xdg_config_home
+        .map(Path::to_path_buf)
+        .or_else(|| home.map(|home| home.join(".config")))
+    else {
+        return Ok(None);
+    };
+    let path = root.join("mnene/config.toml");
+    let invalid = |reason: String| {
+        crate::model::MneneError::Configuration(format!("{}: {reason}", path.display()))
+    };
+    let text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(err) => return Err(invalid(err.to_string())),
+    };
+    let file: FileConfig = toml::from_str(&text).map_err(|err| invalid(err.to_string()))?;
+    if file.default_scope.trim().is_empty() {
+        return Err(invalid("default_scope must not be blank".to_string()));
+    }
+    Ok(Some(file.default_scope))
+}
 
 /// The raw optional values the process edge collected, before resolution.
 ///
@@ -100,6 +136,35 @@ pub struct Config {
 }
 
 impl Config {
+    /// Load user configuration and resolve the configuration for one invocation.
+    ///
+    /// The file's `default_scope` is used only when no existing scope tier
+    /// resolves. Missing files are allowed; there is no built-in default scope.
+    ///
+    /// INVARIANT-BYPASS(CLI-005): the operator-requested config fallback
+    /// supplies scope provenance; all other provenance remains environment-
+    /// sourced and no public provenance-setting flag is added.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::model::MneneError::Configuration`] with the file path
+    /// when a present configuration cannot be read or validated.
+    pub fn load(raw: RawConfig, start_dir: &Path) -> Result<Self, crate::model::MneneError> {
+        let default_scope =
+            load_default_scope(raw.xdg_config_home.as_deref(), raw.home.as_deref())?;
+        let config = Self::resolve(raw, start_dir);
+        if config.scope.is_none()
+            && let Some(scope) = default_scope
+        {
+            return Ok(Self {
+                scope: Some(scope),
+                scope_source: Some(ScopeSource::Config),
+                ..config
+            });
+        }
+        Ok(config)
+    }
+
     /// Returns the configured agent, or [`crate::model::MneneError::MissingAgent`] when
     /// neither `MNENE_AGENT` nor `CLANKER_SESSION_HARNESS` resolved to one.
     ///
@@ -371,6 +436,71 @@ mod tests {
     use crate::model::ScopeSource;
     use std::fs;
     use std::path::Path;
+
+    #[test]
+    fn configuration_without_home_directories_does_not_invent_a_scope()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let config = Config::load(RawConfig::default(), dir.path())?;
+        assert_eq!(None, config.scope);
+        assert_eq!(None, config.scope_source);
+        Ok(())
+    }
+
+    #[test]
+    fn configuration_load_reports_invalid_files_at_the_library_boundary()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let config_root = dir.path().join("mnene");
+        fs::create_dir_all(&config_root)?;
+        let path = config_root.join("config.toml");
+        let raw = RawConfig {
+            xdg_config_home: Some(dir.path().to_path_buf()),
+            ..RawConfig::default()
+        };
+        for text in ["not TOML", "default_scope = ''"] {
+            fs::write(&path, text)?;
+            let result = Config::load(raw.clone(), dir.path());
+            assert!(matches!(
+                result,
+                Err(crate::model::MneneError::Configuration(_))
+            ));
+        }
+        // A directory is unreadable as a config file, including when run as root.
+        let unreadable = dir.path().join("unreadable");
+        fs::create_dir_all(unreadable.join("mnene/config.toml"))?;
+        let raw = RawConfig {
+            xdg_config_home: Some(unreadable),
+            ..RawConfig::default()
+        };
+        let result = Config::load(raw, dir.path());
+        assert!(matches!(
+            result,
+            Err(crate::model::MneneError::Configuration(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn discovered_scope_wins_over_the_configuration_fallback()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let home = tempfile::tempdir()?;
+        let config_root = home.path().join(".config/mnene");
+        fs::create_dir_all(&config_root)?;
+        let text = "default_scope = 'personal'\n";
+        fs::write(config_root.join("config.toml"), text)?;
+        init_repo(dir.path(), "main")?;
+        fs::write(dir.path().join(".clanker"), "project = 'project-slug'\n")?;
+        let raw = RawConfig {
+            home: Some(home.path().to_path_buf()),
+            ..RawConfig::default()
+        };
+        let config = Config::load(raw, dir.path())?;
+        assert_eq!(Some("project-slug".to_string()), config.scope);
+        assert_eq!(Some(ScopeSource::Declared), config.scope_source);
+        Ok(())
+    }
 
     /// Initialize an ordinary (non-worktree) repository at `repo_dir` with
     /// `HEAD` pointing at `refs/heads/<branch>`, optionally with an origin
