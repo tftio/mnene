@@ -6,6 +6,10 @@ on:
 
 permissions:
   contents: read
+  # The reusable workflow requests id-token: write for the crates.io OIDC
+  # exchange. A called workflow cannot request a permission the caller does not
+  # grant, so omitting this fails the run at startup.
+  id-token: write
 
 jobs:
   release-plz:
