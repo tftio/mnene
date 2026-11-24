@@ -1,10 +1,9 @@
 # Changelog
 
-## [0.4.1](https://github.com/tftio/mnene/compare/v0.4.0...v0.4.1) - 2026-11-24
+## [0.4.1](https://github.com/tftio/mnene/compare/v0.4.0...v0.4.1) - 2026-11-23
 
 ### Other
 
-- *(deps)* update dependency cargo:cargo-nextest to v0.9.150 [security] ([#10](https://github.com/tftio/mnene/pull/10))
 - *(deps)* lock file maintenance ([#20](https://github.com/tftio/mnene/pull/20))
 - update tftio/gh-actions reusable workflow pin to v2.5.1 ([#18](https://github.com/tftio/mnene/pull/18))
 - *(deps)* update cargo dependencies (non-major) ([#17](https://github.com/tftio/mnene/pull/17))
